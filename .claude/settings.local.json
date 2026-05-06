@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -ExecutionPolicy Bypass -File run_sim.ps1)",
+      "PowerShell(Test-Path *)",
+      "Bash(Get-ChildItem -Recurse -Include *.vcd,*.fst,*.lxt,*.log)",
+      "Bash(Select-Object FullName)",
+      "Bash(vvp icarus/tb_top.vvp)",
+      "Bash(tee sim_log.txt)",
+      "Bash(iverilog *)"
+    ]
+  }
+}
