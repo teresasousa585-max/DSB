@@ -9,6 +9,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+Set-Location -LiteralPath $PSScriptRoot
+
 # Create output directory if not exists
 if (-not (Test-Path "icarus")) {
     New-Item -ItemType Directory -Path "icarus" | Out-Null

@@ -53,6 +53,7 @@ module dsb_modulator (
             if (carrier_tick) begin
                 envelope       <= pending_envelope;
                 envelope_valid <= sample_seen;
+                sample_seen    <= 1'b0;
             end
         end
     end

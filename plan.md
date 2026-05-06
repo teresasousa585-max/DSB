@@ -2,8 +2,7 @@
 
 ## Stage 1: 生成所有Verilog模块（并行）
 - mcp3201_driver.v — MCP3201 SPI ADC驱动
-- shift595_driver.v — 4片74HC595级联32位移位驱动
-- pwm25_generator.v — 25路独立相位/幅度PWM
+- pwm25_generator.v — 25路独立相位/幅度PWM（并行输出直接驱动换能器）
 - dds_generator.v — DDS正弦波（1kHz调制 + 40kHz载波参考）
 - dsb_modulator.v — DSB调幅器
 - beam_controller.v — 波束相位/幅度控制器

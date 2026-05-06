@@ -32,12 +32,7 @@ module top_ultrasound_array #(
     output wire        adc_clk,
     input  wire        adc_data,
 
-    output wire        srclk,
-    output wire        rclk,
-    output wire        ser,
-
-    output wire [24:0] pwm_out,
-    output wire [31:0] pwm_out_32bit
+    output wire [24:0] pwm_out
 );
 
     localparam integer CARRIER_CNT_WIDTH = 11;
@@ -58,7 +53,6 @@ module top_ultrasound_array #(
     wire       beam_param_valid;
     wire       ultrasound_soft_rst_cmd;
 
-    wire       shift595_busy;
     reg [3:0] soft_rst_cnt;
     wire      ultra_rst_n;
     wire      ultra_run;
@@ -143,19 +137,7 @@ module top_ultrasound_array #(
         .param_valid     (beam_param_valid),
         .envelope        (envelope),
         .envelope_valid  (envelope_valid),
-        .pwm_out         (pwm_out),
-        .pwm_out_32bit   (pwm_out_32bit)
-    );
-
-    shift595_driver u_shift595_driver (
-        .clk    (clk),
-        .rst_n  (ultra_rst_n),
-        .load   (carrier_tick && ultra_run && !shift595_busy),
-        .data   (pwm_out_32bit),
-        .busy   (shift595_busy),
-        .srclk  (srclk),
-        .rclk   (rclk),
-        .ser    (ser)
+        .pwm_out         (pwm_out)
     );
 
     // Keep debug-only status signals visible during simulation.

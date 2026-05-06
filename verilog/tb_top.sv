@@ -17,11 +17,7 @@ module tb_top;
     wire adc_cs;
     wire adc_clk;
     wire adc_data;
-    wire srclk;
-    wire rclk;
-    wire ser;
     wire [24:0] pwm_out;
-    wire [31:0] pwm_out_32bit;
 
     integer pass_cnt;
     integer error_cnt;
@@ -53,11 +49,7 @@ module tb_top;
         .adc_cs         (adc_cs),
         .adc_clk        (adc_clk),
         .adc_data       (adc_data),
-        .srclk          (srclk),
-        .rclk           (rclk),
-        .ser            (ser),
-        .pwm_out        (pwm_out),
-        .pwm_out_32bit  (pwm_out_32bit)
+        .pwm_out        (pwm_out)
     );
 
     initial begin

@@ -38,7 +38,7 @@ Commands:
 
 0x13 SOFT_RESET
   len = 0
-  Disables ultrasound output, resets the carrier/envelope/PWM/595 chain, then
+  Disables ultrasound output, resets the carrier/envelope/PWM chain, then
   reloads the active phase/amplitude table on a carrier boundary.
 ```
 

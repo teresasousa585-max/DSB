@@ -2,11 +2,12 @@
 // Module       : mcp3201_driver
 // Description  : MCP3201 12-bit SPI ADC Driver
 //                - 50MHz system clock input
-//                - 1MHz SPI clock output (50x divider)
+//                - 1MHz SPI clock output (50x divider) — 3.3V safe (max ~1.0MHz)
 //                - 40kHz continuous sampling rate
 //                - SPI Mode 0,0 (CPOL=0, CPHA=0)
 //                - 17 SPI clock cycles per conversion
 // Target       : Generic FPGA (Verilog-2001 synthesizable)
+// Supply       : VDD = 3.3V (see docs/TIMING_MCP3201_3V3.md)
 // Author       : FPGA Design Engineer
 // Date         : 2024
 //=============================================================================
@@ -30,14 +31,18 @@ module mcp3201_driver (
     // Parameter Definitions
     //=========================================================================
     // System and timing parameters (adjustable for different clock rates)
+    // 3.3V supply: fCLK(max) ≈ 1.0 MHz (datasheet: 0.8MHz@2.7V, 1.6MHz@5V)
     parameter CLK_FREQ        = 50_000_000;   // System clock: 50 MHz
-    parameter SPI_CLK_FREQ    = 1_000_000;    // SPI clock: 1 MHz (MCP3201 max 1.6MHz)
+    parameter SPI_CLK_FREQ    = 1_000_000;    // SPI clock: 1 MHz (conservative for 3.3V)
     parameter SAMPLE_RATE     = 40_000;       // Sampling rate: 40 kHz
 
     // Derived timing constants
     parameter SPI_HALF_PERIOD = CLK_FREQ / SPI_CLK_FREQ / 2;  // 25 (50MHz->1MHz)
     parameter SPI_FULL_PERIOD = SPI_HALF_PERIOD * 2;          // 50 clocks per SPI cycle
     parameter SAMPLE_INTERVAL = CLK_FREQ / SAMPLE_RATE;       // 1250 (40kHz period)
+
+    // CS setup time delay: tSUCS(min) = 100 ns @ 50 MHz -> 5 clocks
+    localparam CS_SETUP_DELAY = 5;
 
     //=========================================================================
     // Local State Definitions
@@ -57,11 +62,10 @@ module mcp3201_driver (
                                    // Divides 50MHz to 1MHz (50:1 ratio)
     reg [4:0]  bit_cnt;            // SPI bit counter (0 ~ 16, total 17 clock cycles)
                                    // MCP3201 requires 17 SPI clocks for full conversion:
-                                   //   bit 0:  null bit (DOUT hi-Z during conversion)
-                                   //   bit 1:  start bit (always logic '1')
-                                   //   bit 2:  null bit
-                                   //   bit 3~14: 12-bit ADC data B11~B0 (MSB first)
-                                   //   bit 15~16: sub-LSB bits (optional, can be ignored)
+                                   //   bit 0:  DOUT hi-Z (sampling period, ignore)
+                                   //   bit 1:  NULL bit (always logic '0')
+                                   //   bit 2~13: 12-bit ADC data B11~B0 (MSB first)
+                                   //   bit 14~16: sub-LSB / LSB-first repeat bits (optional, ignore)
     reg [11:0] data_buf;           // 12-bit data buffer for collecting ADC result
 
     //=========================================================================
@@ -110,8 +114,8 @@ module mcp3201_driver (
                     if (tick_cnt == 11'd0) begin
                         state       <= STATE_READING;
                         adc_cs      <= 1'b0;         // Pull CS low to start conversion
-                        adc_clk     <= 1'b1;         // Initialize CLK high so first
-                                                     // transition is a falling edge
+                        adc_clk     <= 1'b0;         // Keep CLK low initially to meet
+                                                     // tSUCS (CS setup) >= 100 ns
                         spi_div_cnt <= 6'd0;
                         bit_cnt     <= 5'd0;
                         data_buf    <= 12'd0;
@@ -125,32 +129,32 @@ module mcp3201_driver (
                 //===========================================================
                 STATE_READING: begin
                     //--- SPI Clock Generation (1MHz from 50MHz) ---
-                    // adc_clk is high for first half (0~24), low for second half (25~49)
-                    // Duty cycle ~50%, frequency = 50MHz/50 = 1MHz
-                    if (spi_div_cnt < SPI_HALF_PERIOD[5:0])
+                    // First clock cycle delayed by CS_SETUP_DELAY to meet tSUCS (100 ns min)
+                    // Normal: adc_clk high for first half (0~24), low for second half (25~49)
+                    if (bit_cnt == 5'd0 && spi_div_cnt < CS_SETUP_DELAY[5:0])
+                        adc_clk <= 1'b0;
+                    else if (spi_div_cnt < SPI_HALF_PERIOD[5:0])
                         adc_clk <= 1'b1;
                     else
                         adc_clk <= 1'b0;
 
                     //--- Data Sampling on Falling Edge ---
-                    // In SPI Mode 0,0: data changes on rising edge, sampled on falling edge
+                    // MCP3201 outputs data on CLK falling edge; we sample at the same edge
                     // Falling edge occurs when spi_div_cnt == SPI_HALF_PERIOD (25)
                     if (spi_div_cnt == SPI_HALF_PERIOD[5:0]) begin
-                        // MCP3201 output data format over 17 SPI clocks:
-                        //  bit_cnt=0:   null bit (DOUT is hi-Z during internal conversion)
-                        //  bit_cnt=1:   start bit = 1 (conversion started indicator)
-                        //  bit_cnt=2:   null bit
-                        //  bit_cnt=3:   B11 (MSB of 12-bit ADC result)
-                        //  bit_cnt=4:   B10
+                        // MCP3201 output data format over SPI clocks:
+                        //  bit_cnt=0:  DOUT hi-Z (sampling period, ignore)
+                        //  bit_cnt=1:  NULL bit (always logic '0')
+                        //  bit_cnt=2:  B11 (MSB of 12-bit ADC result)
+                        //  bit_cnt=3:  B10
                         //  ...
-                        //  bit_cnt=14:  B0  (LSB of 12-bit ADC result)
-                        //  bit_cnt=15:  sub-LSB (sub-resolution bit, may be ignored)
-                        //  bit_cnt=16:  sub-LSB (sub-resolution bit, may be ignored)
+                        //  bit_cnt=13: B0  (LSB of 12-bit ADC result)
+                        //  bit_cnt=14~16: sub-LSB / LSB-first repeat bits (ignore)
 
-                        // Capture only the 12 valid data bits (bit_cnt 3 through 14)
+                        // Capture the 12 valid data bits (bit_cnt 2 through 13)
                         // Store B11 at data_buf[11], B10 at data_buf[10], ..., B0 at data_buf[0]
-                        if (bit_cnt >= 5'd3 && bit_cnt <= 5'd14) begin
-                            data_buf[14 - bit_cnt] <= adc_data;
+                        if (bit_cnt >= 5'd2 && bit_cnt <= 5'd13) begin
+                            data_buf[13 - bit_cnt] <= adc_data;
                         end
                     end
 
