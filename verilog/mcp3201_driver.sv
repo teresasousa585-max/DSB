@@ -5,7 +5,7 @@
 //                - 1MHz SPI clock output (50x divider) — 3.3V safe (max ~1.0MHz)
 //                - 40kHz continuous sampling rate
 //                - SPI Mode 0,0 (CPOL=0, CPHA=0)
-//                - 17 SPI clock cycles per conversion
+//                - 16 SPI clock cycles per conversion
 // Target       : Generic FPGA (Verilog-2001 synthesizable)
 // Supply       : VDD = 3.3V (see docs/TIMING_MCP3201_3V3.md)
 // Author       : FPGA Design Engineer
@@ -47,10 +47,16 @@ module mcp3201_driver (
     //=========================================================================
     // Local State Definitions
     //=========================================================================
-    // Three-state FSM: IDLE -> READING -> DONE -> IDLE
-    localparam STATE_IDLE    = 2'b00;   // Waiting for next 40kHz tick
-    localparam STATE_READING = 2'b01;   // SPI communication in progress
-    localparam STATE_DONE    = 2'b10;   // Conversion complete, output data
+    // Four-state FSM: IDLE -> CS_SETUP -> READING -> DONE -> IDLE
+    localparam STATE_IDLE     = 2'b00;   // Waiting for next 40kHz tick
+    localparam STATE_CS_SETUP = 2'b01;   // CS low before first rising SCLK edge
+    localparam STATE_READING  = 2'b10;   // SPI communication in progress
+    localparam STATE_DONE     = 2'b11;   // Conversion complete, output data
+
+    localparam TOTAL_SPI_CLKS = 16;
+    localparam LAST_SPI_CLK   = TOTAL_SPI_CLKS - 1;
+    localparam FIRST_DATA_CLK = 3;       // 4th rising edge: B11
+    localparam LAST_DATA_CLK  = 14;      // 15th rising edge: B0
 
     //=========================================================================
     // Internal Registers
@@ -58,14 +64,15 @@ module mcp3201_driver (
     reg [1:0]  state;              // Current FSM state
     reg [10:0] tick_cnt;           // 40kHz tick counter (0 ~ SAMPLE_INTERVAL-1)
                                    // Free-running at 50MHz, wraps every 1250 clocks
+    reg [5:0]  setup_cnt;          // CS setup counter before the first SPI clock
     reg [5:0]  spi_div_cnt;        // SPI clock divider (0 ~ SPI_FULL_PERIOD-1)
                                    // Divides 50MHz to 1MHz (50:1 ratio)
-    reg [4:0]  bit_cnt;            // SPI bit counter (0 ~ 16, total 17 clock cycles)
-                                   // MCP3201 requires 17 SPI clocks for full conversion:
-                                   //   bit 0:  DOUT hi-Z (sampling period, ignore)
-                                   //   bit 1:  NULL bit (always logic '0')
-                                   //   bit 2~13: 12-bit ADC data B11~B0 (MSB first)
-                                   //   bit 14~16: sub-LSB / LSB-first repeat bits (optional, ignore)
+    reg [4:0]  bit_cnt;            // SPI rising-edge counter (0 ~ 15)
+                                   // MCP3201 16-clock frame sampled on rising edges:
+                                   //   bit 0~1:  DOUT hi-Z, ignore
+                                   //   bit 2:    NULL bit, ignore
+                                   //   bit 3~14: 12-bit ADC data B11~B0 (MSB first)
+                                   //   bit 15:   LSB-first repeated B1, ignore
     reg [11:0] data_buf;           // 12-bit data buffer for collecting ADC result
 
     //=========================================================================
@@ -76,6 +83,7 @@ module mcp3201_driver (
             // Reset all registers to known state
             state       <= STATE_IDLE;
             tick_cnt    <= 11'd0;
+            setup_cnt   <= 6'd0;
             spi_div_cnt <= 6'd0;
             bit_cnt     <= 5'd0;
             data_buf    <= 12'd0;
@@ -90,7 +98,7 @@ module mcp3201_driver (
             // Wraps every SAMPLE_INTERVAL (1250) clocks @ 50MHz
             // This ensures precise 40kHz sampling rate regardless of
             // conversion time (as long as conversion < 1250 clocks)
-            // 17 SPI cycles x 50 = 850 clocks < 1250, so timing is safe
+            // 16 SPI cycles x 50 + CS setup = ~805 clocks < 1250, so timing is safe
             //---------------------------------------------------------------
             tick_cnt <= (tick_cnt >= SAMPLE_INTERVAL - 1) ? 11'd0 : tick_cnt + 1'b1;
 
@@ -112,10 +120,11 @@ module mcp3201_driver (
                     // At tick_cnt==0, initiate a new ADC conversion
                     // This triggers exactly every 1250 clocks = 40kHz
                     if (tick_cnt == 11'd0) begin
-                        state       <= STATE_READING;
+                        state       <= STATE_CS_SETUP;
                         adc_cs      <= 1'b0;         // Pull CS low to start conversion
                         adc_clk     <= 1'b0;         // Keep CLK low initially to meet
                                                      // tSUCS (CS setup) >= 100 ns
+                        setup_cnt   <= 6'd0;
                         spi_div_cnt <= 6'd0;
                         bit_cnt     <= 5'd0;
                         data_buf    <= 12'd0;
@@ -124,37 +133,44 @@ module mcp3201_driver (
                 end
 
                 //===========================================================
+                // STATE_CS_SETUP: Hold CS low before the first SCLK rising edge
+                //===========================================================
+                STATE_CS_SETUP: begin
+                    adc_cs       <= 1'b0;
+                    adc_clk      <= 1'b0;
+                    sample_valid <= 1'b0;
+                    sample_busy  <= 1'b1;
+
+                    if (setup_cnt >= CS_SETUP_DELAY - 1) begin
+                        state       <= STATE_READING;
+                        setup_cnt   <= 6'd0;
+                        spi_div_cnt <= 6'd0;
+                        bit_cnt     <= 5'd0;
+                    end else begin
+                        setup_cnt <= setup_cnt + 1'b1;
+                    end
+                end
+
+                //===========================================================
                 // STATE_READING: SPI communication with MCP3201
-                // Generate 1MHz SPI clock and sample data on falling edges
+                // Generate 1MHz SPI clock and sample data on rising edges
                 //===========================================================
                 STATE_READING: begin
                     //--- SPI Clock Generation (1MHz from 50MHz) ---
-                    // First clock cycle delayed by CS_SETUP_DELAY to meet tSUCS (100 ns min)
-                    // Normal: adc_clk high for first half (0~24), low for second half (25~49)
-                    if (bit_cnt == 5'd0 && spi_div_cnt < CS_SETUP_DELAY[5:0])
-                        adc_clk <= 1'b0;
-                    else if (spi_div_cnt < SPI_HALF_PERIOD[5:0])
+                    // adc_clk rises at spi_div_cnt == 0 and falls at SPI_HALF_PERIOD.
+                    if (spi_div_cnt == 6'd0)
                         adc_clk <= 1'b1;
-                    else
+                    else if (spi_div_cnt == SPI_HALF_PERIOD)
                         adc_clk <= 1'b0;
 
-                    //--- Data Sampling on Falling Edge ---
-                    // MCP3201 outputs data on CLK falling edge; we sample at the same edge
-                    // Falling edge occurs when spi_div_cnt == SPI_HALF_PERIOD (25)
-                    if (spi_div_cnt == SPI_HALF_PERIOD[5:0]) begin
-                        // MCP3201 output data format over SPI clocks:
-                        //  bit_cnt=0:  DOUT hi-Z (sampling period, ignore)
-                        //  bit_cnt=1:  NULL bit (always logic '0')
-                        //  bit_cnt=2:  B11 (MSB of 12-bit ADC result)
-                        //  bit_cnt=3:  B10
-                        //  ...
-                        //  bit_cnt=13: B0  (LSB of 12-bit ADC result)
-                        //  bit_cnt=14~16: sub-LSB / LSB-first repeat bits (ignore)
-
-                        // Capture the 12 valid data bits (bit_cnt 2 through 13)
+                    //--- Data Sampling on Rising Edge ---
+                    // MCP3201 updates DOUT on CLK falling edges; the FPGA samples the
+                    // stable value on the following CLK rising edge.
+                    if (spi_div_cnt == 6'd0) begin
+                        // Capture B11..B0 on rising edges 4 through 15.
                         // Store B11 at data_buf[11], B10 at data_buf[10], ..., B0 at data_buf[0]
-                        if (bit_cnt >= 5'd2 && bit_cnt <= 5'd13) begin
-                            data_buf[13 - bit_cnt] <= adc_data;
+                        if (bit_cnt >= FIRST_DATA_CLK && bit_cnt <= LAST_DATA_CLK) begin
+                            data_buf[LAST_DATA_CLK - bit_cnt] <= adc_data;
                         end
                     end
 
@@ -164,8 +180,8 @@ module mcp3201_driver (
                         // One complete SPI clock cycle done
                         spi_div_cnt <= 6'd0;
 
-                        // After 17 SPI clock cycles (bit_cnt 0~16), conversion is complete
-                        if (bit_cnt >= 5'd16) begin
+                        // After 16 SPI clock cycles (bit_cnt 0~15), conversion is complete
+                        if (bit_cnt >= LAST_SPI_CLK) begin
                             state <= STATE_DONE;
                         end else begin
                             bit_cnt <= bit_cnt + 1'b1;
