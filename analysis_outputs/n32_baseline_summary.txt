@@ -1,0 +1,34 @@
+N32 baseline report, 40 kHz carrier, 16 mm circular piston elements
+element_count: 32
+wavelength_mm: 8.575
+element_diameter_mm: 16.000
+aperture_diameter_mm: 116.007
+aperture_in_lambda: 13.529
+min_center_distance_mm: 16.920
+min_center_distance_in_lambda: 1.973
+
+Circular normalized carrier patterns:
+  broadside      target= 0.00 deg, peak= 0.00 deg phi=  0.00 deg, err= 0.00 deg, outside8=-13.53 dB
+  steer20        target=20.00 deg, peak=19.71 deg phi=  0.00 deg, err= 0.29 deg, outside8= -4.70 dB
+  focus200       target= 0.00 deg, peak= 0.00 deg phi=  0.00 deg, err= 0.00 deg, outside8= -5.83 dB
+  offset40_200   target=11.31 deg, peak=12.38 deg phi=180.00 deg, err=23.68 deg, outside8=  0.00 dB
+
+Z=200 mm focus maps, level relative to target:
+  focus200       phase_only pressure_PSL=-11.04 dB, audio_proxy=-22.09 dB, P_FWHM=( 14.9, 14.9)mm, audio_FWHM=( 10.7, 10.7)mm, gain=  0.00 dB, err= 0.0 mm
+  focus200       rls_amp    pressure_PSL=-12.03 dB, audio_proxy=-24.07 dB, P_FWHM=( 16.9, 16.9)mm, audio_FWHM=( 12.1, 12.1)mm, gain= -2.85 dB, err= 0.0 mm
+  offset40_200   phase_only pressure_PSL= -7.99 dB, audio_proxy=-15.97 dB, P_FWHM=( 15.7, 15.2)mm, audio_FWHM=( 11.3, 10.8)mm, gain=  0.00 dB, err= 1.0 mm
+  offset40_200   rls_amp    pressure_PSL=-10.93 dB, audio_proxy=-21.85 dB, P_FWHM=( 17.7, 17.0)mm, audio_FWHM=( 12.6, 12.1)mm, gain= -2.85 dB, err= 1.0 mm
+
+Usable radius by z, criteria: pressure PSL <= -10 dB, gain drop >= -5 dB, focus error <= 5 mm:
+  phase_only z=100 mm: radius=  nan mm, angle=  nan deg
+  phase_only z=150 mm: radius=  nan mm, angle=  nan deg
+  phase_only z=200 mm: radius= 10.0 mm, angle=  2.9 deg
+  phase_only z=300 mm: radius= 30.0 mm, angle=  5.7 deg
+  phase_only z=400 mm: radius=  nan mm, angle=  nan deg
+  phase_only z=500 mm: radius=  nan mm, angle=  nan deg
+  rls_amp    z=100 mm: radius= 10.0 mm, angle=  5.7 deg
+  rls_amp    z=150 mm: radius= 40.0 mm, angle= 14.9 deg
+  rls_amp    z=200 mm: radius= 50.0 mm, angle= 14.0 deg
+  rls_amp    z=300 mm: radius=  nan mm, angle=  nan deg
+  rls_amp    z=400 mm: radius=  nan mm, angle=  nan deg
+  rls_amp    z=500 mm: radius=  nan mm, angle=  nan deg

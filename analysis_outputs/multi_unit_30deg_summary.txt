@@ -1,0 +1,18 @@
+30-degree steering optimization study
+=====================================
+Bowl radius R: 0.176 m
+Focus direction: theta_x = 30.0 deg, theta_y = 0.0 deg
+
+case           dist       u_SL      u_p99       h_SL      h_p99       o_SL      o_p99
+R0.5_x30_y0     0.5     -11.30     -13.01     -11.62     -12.68     -12.60     -12.78
+R1.0_x30_y0     1.0      -9.55     -10.66      -9.43     -10.71     -12.20     -12.45
+R2.0_x30_y0     2.0      -9.30     -11.31      -9.28     -11.19     -11.86     -12.04
+R3.0_x30_y0     3.0     -10.03     -11.15     -10.02     -11.04     -12.22     -12.74
+R5.0_x30_y0     5.0     -10.03     -11.47      -9.64     -11.23     -12.67     -13.22
+
+Unit cos(theta) to 30-deg direction:
+  Unit 0 (-45.0 deg): cos_theta = 0.966
+  Unit 1 (-22.5 deg): cos_theta = 0.991
+  Unit 2 (0.0 deg): cos_theta = 0.866
+  Unit 3 (22.5 deg): cos_theta = 0.609
+  Unit 4 (45.0 deg): cos_theta = 0.259

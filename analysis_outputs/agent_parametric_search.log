@@ -1,0 +1,26 @@
+[grid] rect 3x4: 49 candidates in 1.6 s
+[grid] ring 1+4+7: 1752 candidates in 54.7 s
+[grid] ring 5+7: 1590 candidates in 51.0 s
+[grid] sunflower: 480 candidates in 13.4 s
+[optimize] rect_3x4: 5.9 s
+[optimize] ring_1_4_7: 10.0 s
+[optimize] ring_5_7: 13.1 s
+[optimize] sunflower: 9.4 s
+[blue-noise] generated 200 candidates in 6.5 s (tries=200)
+analysis/agent_parametric_search.py:364: RuntimeWarning: invalid value encountered in maximum
+  db = np.maximum(db, DB_FLOOR)
+
+===== SUMMARY =====
+Best score: -9.1077
+Best family/name: ring_1_4_7_r18.0_36.0_rot4_37.5_rot7_12.9
+Min spacing: 18.000 mm
+Recommended unit width: 90.19 mm
+Worst max sidelobe: -5.92 dB
+Worst p99 sidelobe: -9.11 dB
+Total runtime: 166.4 s
+===================
+
+analysis_outputs\agent_parametric_candidates.csv
+analysis_outputs\agent_parametric_best.csv
+analysis_outputs\agent_parametric_layout.png
+analysis_outputs\agent_parametric_patterns.png

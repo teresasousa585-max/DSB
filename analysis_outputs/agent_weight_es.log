@@ -1,0 +1,17 @@
+Optimizing broadside (0.0, 0.0) ...
+  uniform SL=-8.30 p99=-11.95 | opt SL=-8.90 p99=-11.95 gain=-1.94 dB
+Optimizing steer_x15 (15.0, 0.0) ...
+  uniform SL=-4.00 p99=-7.52 | opt SL=-4.92 p99=-7.19 gain=-1.94 dB
+Optimizing steer_x-15 (-15.0, 0.0) ...
+  uniform SL=-4.00 p99=-7.52 | opt SL=-4.94 p99=-7.26 gain=-1.94 dB
+Optimizing steer_y15 (0.0, 15.0) ...
+  uniform SL=-2.50 p99=-7.50 | opt SL=-4.13 p99=-6.98 gain=-1.94 dB
+Optimizing steer_y-15 (0.0, -15.0) ...
+  uniform SL=-2.50 p99=-7.50 | opt SL=-4.26 p99=-7.01 gain=-1.94 dB
+analysis/agent_weight_es.py:222: RuntimeWarning: invalid value encountered in maximum
+  plot_db = np.maximum(db, DB_FLOOR)
+analysis_outputs\agent_weight_es_summary.txt
+analysis_outputs\agent_weight_es_weights.csv
+analysis_outputs\agent_weight_es_metrics.csv
+analysis_outputs\agent_weight_es_patterns.png
+analysis_outputs\agent_weight_es_weights.png

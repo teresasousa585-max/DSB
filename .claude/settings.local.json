@@ -37,7 +37,15 @@
       "Bash(cmd *)",
       "Bash(powershell *)",
       "PowerShell(C:\\\\msys32\\\\usr\\\\bin\\\\python3.6.exe -c \"import sys; print\\(sys.version\\)\")",
-      "Bash(python3.6 *)"
+      "Bash(python3.6 *)",
+      "Bash(Get-ChildItem analysis *)",
+      "Bash(Select-Object Name, LastWriteTime)",
+      "Bash(PYTHONPATH=analysis /c/program1/Anaconda3/python.exe *)",
+      "Bash(PYTHONPATH=\"$PWD/python_libs\" python *)",
+      "Read(//usr/**)",
+      "Bash(ls /c/Python*/python.exe)",
+      "Read(//c/Users/**)",
+      "Bash(PYTHONPATH=\"$PWD/python_libs\" /c/msys32/usr/bin/python3.6.exe *)"
     ]
   }
 }

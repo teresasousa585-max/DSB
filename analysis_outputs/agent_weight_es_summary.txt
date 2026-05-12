@@ -1,0 +1,24 @@
+N12 phase + amplitude optimization report (DE)
+Layout: analysis_outputs/n12_unit_recommended_layout.csv
+Algorithm: steering phase + phase offset + amplitude, optimized via differential evolution.
+Bounds: amp in [0,1], phase offset in [-pi, pi].
+
+  broadside       steer=(  0.0,  0.0): uniform SL= -8.30 p99=-11.95; opt SL= -8.90 p99=-11.95 gain= -1.94 meanAmp=0.80
+  steer_x15       steer=( 15.0,  0.0): uniform SL= -4.00 p99= -7.52; opt SL= -4.92 p99= -7.19 gain= -1.94 meanAmp=0.81
+  steer_x-15      steer=(-15.0,  0.0): uniform SL= -4.00 p99= -7.52; opt SL= -4.94 p99= -7.26 gain= -1.94 meanAmp=0.81
+  steer_y15       steer=(  0.0, 15.0): uniform SL= -2.50 p99= -7.50; opt SL= -4.13 p99= -6.98 gain= -1.94 meanAmp=0.81
+  steer_y-15      steer=(  0.0,-15.0): uniform SL= -2.50 p99= -7.50; opt SL= -4.26 p99= -7.01 gain= -1.94 meanAmp=0.81
+
+Optimized amplitudes:
+  broadside: 0.865, 0.999, 0.561, 1.000, 0.997, 0.673, 0.647, 0.911, 0.790, 0.437, 0.805, 0.919
+  steer_x15: 0.975, 1.000, 0.780, 0.406, 0.988, 0.682, 0.561, 0.867, 0.909, 0.673, 0.888, 1.000
+  steer_x-15: 0.936, 0.985, 0.819, 0.367, 0.990, 0.690, 0.527, 0.870, 0.885, 0.808, 0.842, 1.000
+  steer_y15: 0.958, 0.988, 0.982, 0.992, 0.279, 0.499, 0.749, 0.912, 0.815, 0.683, 0.856, 0.998
+  steer_y-15: 0.976, 0.979, 0.941, 0.950, 0.414, 0.633, 0.890, 0.888, 0.737, 0.551, 0.761, 1.000
+
+Optimized phase offsets (deg):
+  broadside: -49.35, -49.60, -43.27, -48.21, -48.39, -48.73, -47.47, -48.27, -50.63, -45.58, -48.68, -49.61
+  steer_x15: 29.16, 58.08, 28.14, 24.14, 43.13, 36.05, 33.53, 36.77, 29.76, 29.82, 44.09, 44.66
+  steer_x-15: -95.42, -123.89, -98.70, -96.72, -111.66, -105.18, -98.79, -99.20, -97.05, -98.45, -109.99, -113.71
+  steer_y15: 10.26, -0.35, 0.08, 14.66, -4.38, 11.65, -0.21, 27.09, 1.45, 5.15, 14.41, 1.41
+  steer_y-15: 85.12, 92.12, 96.55, 83.04, 97.45, 81.42, 90.10, 69.28, 89.66, 69.03, 76.13, 94.53

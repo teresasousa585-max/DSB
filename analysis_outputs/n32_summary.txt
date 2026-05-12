@@ -1,0 +1,12 @@
+N32 sparse circular-ring array summary
+frequency_hz: 40000.0
+wavelength_mm: 8.575
+element_diameter_mm: 16.000
+aperture_diameter_mm: 116.007
+aperture_in_wavelengths: 13.529
+min_center_distance_mm: 16.920
+min_center_distance_in_wavelengths: 1.973
+element_first_null_deg: 40.82
+main_exclusion_for_sidelobe_deg: 8.00
+
+See n32_metrics.csv for per-case values.
