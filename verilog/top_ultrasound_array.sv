@@ -187,6 +187,7 @@ ila_0 u_ila_0 (
     logic [11:0] beam_phase     [0:31];
     logic [7:0]  uart_byte;
     logic        uart_done;
+    logic        beam_update_pulse;
     
     uart_rx #(.CLK_FRE(100),
      .BAUD_RATE(115200)) u_uart_rx (
@@ -203,7 +204,8 @@ ila_0 u_ila_0 (
         .rx_data(uart_byte),
          .rx_done(uart_done),
         .o_amplitude(beam_amplitude), 
-        .o_phase(beam_phase)
+        .o_phase(beam_phase),
+        .o_update_pulse(beam_update_pulse)
     );
 
     // 6. 核心调制与驱动 (接收 16位音频流)
@@ -216,5 +218,9 @@ ila_0 u_ila_0 (
         .pwm_out   (transducer_io)
     );
 
+    // Keep the parser commit pulse available for ILA/debug without changing IO.
+    // synopsys translate_off
+    wire _unused_beam_update_pulse = beam_update_pulse;
+    // synopsys translate_on
 
 endmodule

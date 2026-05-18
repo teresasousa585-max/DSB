@@ -35,8 +35,8 @@ LAMBDA = C / FREQ
 K = 2.0 * np.pi / LAMBDA
 
 # 扫描工况：距离 (mm) 和 偏转角度 (deg)
-DISTANCES_MM = [100, 150, 200, 300, 400, 500, 700, 1000, 1500, 2000]
-STEER_ANGLES_DEG = [-15.0, 15.0]
+DISTANCES_MM = [100, 150, 200, 300, 400, 500, 700, 1000, 1500, 2000, 3000, 4000, 4999]
+STEER_ANGLES_DEG = [-15.0, -7.5, 0.0, 7.5, 15.0]
 
 ROOT = os.path.dirname(os.path.dirname(__file__))
 OUT_DIR = os.path.join(ROOT, "analysis_outputs")
