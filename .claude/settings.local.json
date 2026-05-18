@@ -45,7 +45,9 @@
       "Read(//usr/**)",
       "Bash(ls /c/Python*/python.exe)",
       "Read(//c/Users/**)",
-      "Bash(PYTHONPATH=\"$PWD/python_libs\" /c/msys32/usr/bin/python3.6.exe *)"
+      "Bash(PYTHONPATH=\"$PWD/python_libs\" /c/msys32/usr/bin/python3.6.exe *)",
+      "Bash(where python3 *)",
+      "Bash(\"C:\\\\msys32\\\\usr\\\\bin\\\\python3.exe\" --version)"
     ]
   }
 }
