@@ -185,9 +185,13 @@ ila_0 u_ila_0 (
     // 5. 串口协议解析 (幅度与相位控制)
     logic [7:0]  beam_amplitude [0:31];
     logic [11:0] beam_phase     [0:31];
-    logic [7:0]  uart_byte;
-    logic        uart_done;
-    logic        beam_update_pulse;
+    (* mark_debug = "true", keep = "true" *) logic [7:0]  uart_byte;
+    (* mark_debug = "true", keep = "true" *) logic        uart_done;
+    (* mark_debug = "true", keep = "true" *) logic        beam_update_pulse;
+    (* mark_debug = "true", keep = "true" *) logic [15:0] uart_done_stretch_cnt;
+    (* mark_debug = "true", keep = "true" *) logic [15:0] beam_update_stretch_cnt;
+    (* mark_debug = "true", keep = "true" *) logic        uart_done_debug;
+    (* mark_debug = "true", keep = "true" *) logic        beam_update_debug;
     
     uart_rx #(.CLK_FRE(100),
      .BAUD_RATE(115200)) u_uart_rx (
@@ -208,6 +212,27 @@ ila_0 u_ila_0 (
         .o_update_pulse(beam_update_pulse)
     );
 
+    // Stretch single-cycle UART/debug pulses so they are easy to observe in ILA.
+    always_ff @(posedge clk_100m or negedge rst_n) begin
+        if (!rst_n) begin
+            uart_done_stretch_cnt   <= 16'd0;
+            beam_update_stretch_cnt <= 16'd0;
+        end else begin
+            if (uart_done)
+                uart_done_stretch_cnt <= 16'hFFFF;
+            else if (uart_done_stretch_cnt != 16'd0)
+                uart_done_stretch_cnt <= uart_done_stretch_cnt - 1'b1;
+
+            if (beam_update_pulse)
+                beam_update_stretch_cnt <= 16'hFFFF;
+            else if (beam_update_stretch_cnt != 16'd0)
+                beam_update_stretch_cnt <= beam_update_stretch_cnt - 1'b1;
+        end
+    end
+
+    assign uart_done_debug = (uart_done_stretch_cnt != 16'd0);
+    assign beam_update_debug = (beam_update_stretch_cnt != 16'd0);
+
     // 6. 核心调制与驱动 (接收 16位音频流)
     pwm32_generator u_pwm32 (
         .clk       (clk_100m),
@@ -217,10 +242,5 @@ ila_0 u_ila_0 (
         .phase_del (beam_phase),
         .pwm_out   (transducer_io)
     );
-
-    // Keep the parser commit pulse available for ILA/debug without changing IO.
-    // synopsys translate_off
-    wire _unused_beam_update_pulse = beam_update_pulse;
-    // synopsys translate_on
 
 endmodule
