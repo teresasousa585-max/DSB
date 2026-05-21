@@ -1,2 +1,6 @@
 /python_libs
 /.claude
+__pycache__/
+*.pyc
+*.vcd
+/icarus/*.vvp

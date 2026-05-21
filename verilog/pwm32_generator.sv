@@ -45,25 +45,16 @@ module pwm32_generator (
             assign duty_ch_mult = duty_base_d2 * {12'h0, amplitude[i]};
 
             logic [11:0] duty_ch_d3;
-            logic [11:0] center_d3;
+            logic [12:0] start_raw_d3;
             always_ff @(posedge clk or negedge rst_n) begin
                 if (!rst_n) begin
                     duty_ch_d3   <= 12'd0;
-                    center_d3    <= 12'd0;
+                    start_raw_d3 <= 13'd0;
                 end else begin
                     duty_ch_d3   <= duty_ch_mult[19:8];
-                    center_d3    <= (phase_del[i] >= 12'd2500) ? (phase_del[i] - 12'd2500) : phase_del[i];
+                    start_raw_d3 <= {1'b0, phase_del[i]};
                 end
             end
-
-            logic [11:0] half_duty_d3;
-            logic [12:0] start_centered_raw;
-            logic [11:0] start_centered;
-            assign half_duty_d3 = duty_ch_d3 >> 1;
-            assign start_centered_raw = ({1'b0, center_d3} >= {1'b0, half_duty_d3}) ?
-                                        ({1'b0, center_d3} - {1'b0, half_duty_d3}) :
-                                        ({1'b0, center_d3} + 13'd2500 - {1'b0, half_duty_d3});
-            assign start_centered = start_centered_raw[11:0];
 
             logic [11:0] duty_ch_d4;
             logic [11:0] start_d4;
@@ -75,12 +66,12 @@ module pwm32_generator (
                     end_raw_d4 <= 13'd0;
                 end else begin
                     duty_ch_d4 <= duty_ch_d3;
-                    start_d4   <= start_centered;
-                    end_raw_d4 <= {1'b0, start_centered} + duty_ch_d3;
+                    start_d4   <= (start_raw_d3 >= 13'd2500) ? (start_raw_d3 - 13'd2500) : start_raw_d3[11:0];
+                    end_raw_d4 <= ((start_raw_d3 >= 13'd2500) ? (start_raw_d3 - 13'd2500) : start_raw_d3[11:0]) + duty_ch_d3;
                 end
             end
 
-            // phase_del is the pulse center; commit the next channel window only on a carrier boundary.
+            // Commit the next channel window only on a carrier boundary.
             logic [11:0] duty_locked;
             logic [11:0] start_locked;
             logic [11:0] end_locked;

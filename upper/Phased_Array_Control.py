@@ -1,32 +1,59 @@
-import sys
-import os
-import serial
-import serial.tools.list_ports
 import datetime
-import struct
-import math
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout, QHBoxLayout,
-    QWidget, QPushButton, QComboBox, QTextEdit, QLabel,
-    QMessageBox, QSlider, QGroupBox, QGridLayout
-)
+import os
+import sys
+
+try:
+    import serial
+    import serial.tools.list_ports
+except ImportError:
+    serial = None
+
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QFont, QIcon
+from PyQt6.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QSlider,
+    QSpinBox,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
-# ==========================================
-# 资源路径处理函数
-# ==========================================
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
+
+from n32_beam_params import (  # noqa: E402
+    AMPLITUDE_MODES,
+    MAX_DISTANCE_MM,
+    MAX_STEER_DEG,
+    MIN_DISTANCE_MM,
+    MODE_FITTED,
+    build_packet,
+    calculate_beam_params,
+    format_packet_hex,
+    load_layout,
+)
+
+
 def resource_path(relative_path):
-    if hasattr(sys, '_MEIPASS'):
+    if hasattr(sys, "_MEIPASS"):
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.abspath("."), relative_path)
 
-# ==========================================
-# 🌌 V18 极客深空·相控阵专属样式表
-# ==========================================
+
 STYLESHEET = """
 QMainWindow {
-    background-color: #1E1E1E; 
+    background-color: #1E1E1E;
     border-image: url('bg.jpg') 0 0 0 0 stretch stretch;
 }
 QWidget {
@@ -35,83 +62,91 @@ QWidget {
     color: #E0E0E0;
 }
 QWidget#LeftPanel {
-    background-color: rgba(20, 20, 25, 0.7); 
-    border-right: 1px solid rgba(64, 196, 255, 0.2); 
+    background-color: rgba(20, 20, 25, 0.72);
+    border-right: 1px solid rgba(64, 196, 255, 0.24);
 }
-QTextEdit, QComboBox {
-    background-color: rgba(0, 0, 0, 0.4); 
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 4px; 
+QTextEdit, QComboBox, QSpinBox {
+    background-color: rgba(0, 0, 0, 0.42);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 4px;
     padding: 6px;
-    color: #00E5FF; 
+    color: #00E5FF;
 }
 QPushButton {
-    background-color: rgba(255, 255, 255, 0.08); 
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     color: #E0E0E0;
     padding: 8px;
     border-radius: 6px;
 }
 QPushButton:hover {
-    background-color: rgba(64, 196, 255, 0.25); 
+    background-color: rgba(64, 196, 255, 0.25);
     border: 1px solid #40C4FF;
     color: #40C4FF;
 }
 QPushButton#btn_action {
-    background-color: rgba(0, 188, 212, 0.5); 
-    border: 1px solid rgba(0, 229, 255, 0.6);
+    background-color: rgba(0, 188, 212, 0.50);
+    border: 1px solid rgba(0, 229, 255, 0.60);
     font-weight: bold;
 }
 QPushButton#btn_danger {
-    background-color: rgba(255, 87, 34, 0.5); 
-    border: 1px solid rgba(255, 87, 34, 0.6);
+    background-color: rgba(255, 87, 34, 0.55);
+    border: 1px solid rgba(255, 87, 34, 0.70);
 }
 QGroupBox {
-    border: 1px solid rgba(64, 196, 255, 0.3);
+    border: 1px solid rgba(64, 196, 255, 0.30);
     border-radius: 8px;
     margin-top: 15px;
     padding-top: 20px;
-    color: #40C4FF; 
+    color: #40C4FF;
     font-weight: bold;
-    background-color: rgba(0, 0, 0, 0.2); 
+    background-color: rgba(0, 0, 0, 0.22);
 }
-QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; }
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 5px;
+}
 QSlider::groove:horizontal {
-    border: 1px solid #999999;
+    border: 1px solid #777777;
     height: 8px;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.50);
     border-radius: 4px;
 }
 QSlider::handle:horizontal {
     background: #00E5FF;
     border: 1px solid #00E5FF;
     width: 18px;
-    margin: -5px 0; 
+    margin: -5px 0;
     border-radius: 9px;
 }
-/* 阵列探头 Label 样式 */
 QLabel.transducer {
-    background-color: rgba(0, 229, 255, 0.05);
-    border: 1px solid rgba(0, 229, 255, 0.3);
-    border-radius: 35px; /* 变成圆形 */
-    color: #FFF;
+    background-color: rgba(0, 229, 255, 0.08);
+    border: 1px solid rgba(0, 229, 255, 0.30);
+    border-radius: 6px;
+    color: #FFFFFF;
     font-family: "Consolas";
-    font-size: 12px;
+    font-size: 11px;
 }
 """
+
 
 class SerialLogic:
     def __init__(self):
         self.ser = None
 
     def open(self, port, baud):
+        if serial is None:
+            return False, "pyserial is not installed"
+        if not port:
+            return False, "no serial port selected"
         if self.ser and self.ser.is_open:
-            return False, "已打开"
+            return False, "already open"
         try:
             self.ser = serial.Serial(port=port.split(" ")[0], baudrate=int(baud), timeout=0)
-            return True, "成功"
-        except Exception as e:
-            return False, str(e)
+            return True, "ok"
+        except Exception as exc:
+            return False, str(exc)
 
     def close(self):
         if self.ser:
@@ -119,69 +154,36 @@ class SerialLogic:
 
     def send(self, data):
         if not self.ser or not self.ser.is_open:
-            return False, "未连接"
+            return False, "not connected"
         try:
             self.ser.write(data)
-            return True, "成功"
-        except Exception as e:
-            return False, str(e)
+            return True, "ok"
+        except Exception as exc:
+            return False, str(exc)
 
 
 class PhasedArrayWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("相控阵波束控制终端 - Phased Array Controller")
-        self.resize(1100, 800)
-        
+        self.setWindowTitle("N32 Phased Array Controller")
+        self.resize(1180, 840)
+
         icon_path = resource_path("icon.jpg")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
 
         self.logic = SerialLogic()
-        
-        # 物理常数与 FPGA 参数
-        self.d = 0.0172           # 阵元间距 17.2mm
-        self.c = 340.0            # 声速 340m/s
-        self.fpga_clk = 100_000_000 # 100MHz 
-        self.period = 2500        # 2500 计数值 = 25us (40kHz)
-        
-        # 【新增】物理网格(0~24) 到 FPGA硬件通道(0~24) 的蛇形映射表
-        # 对应硬件 PCB 的 S 型走线 CH1 ~ CH25
-        self.grid_to_hw = [
-             4,  3,  2,  1,  0,
-             5,  6,  7,  8,  9,
-            14, 13, 12, 11, 10,
-            15, 16, 17, 18, 19,
-            24, 23, 22, 21, 20
-        ]
-        
-        # 权重矩阵预置
-        self.windows = {
-            "高斯窗 (Gaussian)": [
-                5, 21, 35, 21, 5,
-                21, 94, 155, 94, 21,
-                35, 155, 255, 155, 35,
-                21, 94, 155, 94, 21,
-                5, 21, 35, 21, 5
-            ],
-            "汉明窗 (Hamming)": [
-                2, 11, 20, 11, 2,
-                11, 74, 138, 74, 11,
-                20, 138, 255, 138, 20,
-                11, 74, 138, 74, 11,
-                2, 11, 20, 11, 2
-            ],
-            "矩形窗 (Rectangular, 漏音大)": [255] * 25
-        }
-        
-        # 保存发送给硬件的 25 个真实参数槽位
-        self.current_amps = [255] * 25
-        self.current_phases = [0] * 25
+        self.coords_mm = load_layout()
+        self.current_amps = [255] * 32
+        self.current_phases = [0] * 32
         self.transducer_labels = []
+        self.auto_timer = QTimer(self)
+        self.auto_timer.setSingleShot(True)
+        self.auto_timer.timeout.connect(self.send_to_fpga)
 
         self.init_ui()
         self.refresh_ports()
-        self.calculate_array() # 初始化时计算一次默认界面
+        self.calculate_array()
 
     def init_ui(self):
         main_widget = QWidget()
@@ -190,113 +192,111 @@ class PhasedArrayWindow(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # ===============================================
-        # 1. 左侧面板 (串口连接与日志)
-        # ===============================================
         left_panel = QWidget()
         left_panel.setObjectName("LeftPanel")
-        left_panel.setFixedWidth(300)
+        left_panel.setFixedWidth(315)
         left_layout = QVBoxLayout(left_panel)
-        
-        lbl_logo = QLabel("📡 硬件连接 (LINK)")
+
+        lbl_logo = QLabel("FPGA LINK")
         lbl_logo.setStyleSheet("color: #00E5FF; font-weight: bold; font-size: 18px;")
         left_layout.addWidget(lbl_logo)
-        
+
         self.cmb_port = QComboBox()
         self.cmb_baud = QComboBox()
         self.cmb_baud.addItems(["115200", "921600", "9600"])
-        
-        left_layout.addWidget(QLabel("端口号 (Port):"))
+
+        left_layout.addWidget(QLabel("Port:"))
         left_layout.addWidget(self.cmb_port)
-        btn_refresh = QPushButton("🔄 刷新端口")
+        btn_refresh = QPushButton("Refresh ports")
         btn_refresh.clicked.connect(self.refresh_ports)
         left_layout.addWidget(btn_refresh)
-        
-        left_layout.addWidget(QLabel("波特率 (Baudrate):"))
+
+        left_layout.addWidget(QLabel("Baudrate:"))
         left_layout.addWidget(self.cmb_baud)
-        
-        self.btn_open = QPushButton("🔗 连接 FPGA (CONNECT)")
+
+        self.btn_open = QPushButton("Connect FPGA")
         self.btn_open.setObjectName("btn_action")
-        self.btn_open.setMinimumHeight(45)
+        self.btn_open.setMinimumHeight(44)
         self.btn_open.clicked.connect(self.toggle_serial)
         left_layout.addWidget(self.btn_open)
-        
-        left_layout.addSpacing(20)
-        left_layout.addWidget(QLabel("通信日志 (LOG):"))
+
+        self.chk_auto_send = QCheckBox("Auto sync after parameter changes")
+        left_layout.addWidget(self.chk_auto_send)
+
+        left_layout.addSpacing(16)
+        left_layout.addWidget(QLabel("Log:"))
         self.txt_log = QTextEdit()
         self.txt_log.setReadOnly(True)
         left_layout.addWidget(self.txt_log)
-        
-        btn_clear = QPushButton("🗑 清空日志")
+
+        btn_clear = QPushButton("Clear log")
         btn_clear.clicked.connect(self.txt_log.clear)
         left_layout.addWidget(btn_clear)
 
-        # ===============================================
-        # 2. 右侧面板 (阵列解算与控制)
-        # ===============================================
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(20, 20, 20, 20)
-        
-        # --- 顶部控制区 ---
-        grp_ctrl = QGroupBox("🎛️ 波束偏转与赋形控制 (Beam Steering & Apodization)")
-        ctrl_l = QVBoxLayout(grp_ctrl)
-        
-        # 窗函数选择
-        h_win = QHBoxLayout()
-        h_win.addWidget(QLabel("空间加窗模式 (降低漏音):"))
-        self.cmb_win = QComboBox()
-        self.cmb_win.addItems(self.windows.keys())
-        self.cmb_win.currentIndexChanged.connect(self.calculate_array)
-        h_win.addWidget(self.cmb_win)
-        h_win.addStretch()
-        ctrl_l.addLayout(h_win)
-        
-        # 水平角度
-        h_az = QHBoxLayout()
-        self.lbl_az = QLabel("水平偏转角 (Azimuth θ): 0°")
-        self.lbl_az.setFixedWidth(200)
-        self.sld_az = QSlider(Qt.Orientation.Horizontal)
-        self.sld_az.setRange(-60, 60)
-        self.sld_az.setValue(0)
-        self.sld_az.valueChanged.connect(self.calculate_array)
-        h_az.addWidget(self.lbl_az)
-        h_az.addWidget(self.sld_az)
-        ctrl_l.addLayout(h_az)
 
-        # 垂直角度
-        h_el = QHBoxLayout()
-        self.lbl_el = QLabel("垂直偏转角 (Elevation φ): 0°")
-        self.lbl_el.setFixedWidth(200)
-        self.sld_el = QSlider(Qt.Orientation.Horizontal)
-        self.sld_el.setRange(-60, 60)
-        self.sld_el.setValue(0)
+        grp_ctrl = QGroupBox("N32 focus and steering")
+        ctrl_l = QVBoxLayout(grp_ctrl)
+
+        h_amp = QHBoxLayout()
+        h_amp.addWidget(QLabel("Amplitude mode:"))
+        self.cmb_amp = QComboBox()
+        self.cmb_amp.addItems(AMPLITUDE_MODES)
+        self.cmb_amp.setCurrentText(MODE_FITTED)
+        self.cmb_amp.currentIndexChanged.connect(self.calculate_array)
+        h_amp.addWidget(self.cmb_amp)
+        h_amp.addStretch()
+        ctrl_l.addLayout(h_amp)
+
+        self.lbl_az = QLabel()
+        self.sld_az = self.make_slider(-int(MAX_STEER_DEG), int(MAX_STEER_DEG), 0)
+        self.sld_az.valueChanged.connect(self.calculate_array)
+        ctrl_l.addLayout(self.make_labeled_slider(self.lbl_az, self.sld_az))
+
+        self.lbl_el = QLabel()
+        self.sld_el = self.make_slider(-int(MAX_STEER_DEG), int(MAX_STEER_DEG), 0)
         self.sld_el.valueChanged.connect(self.calculate_array)
-        h_el.addWidget(self.lbl_el)
-        h_el.addWidget(self.sld_el)
-        ctrl_l.addLayout(h_el)
-        
+        ctrl_l.addLayout(self.make_labeled_slider(self.lbl_el, self.sld_el))
+
+        h_dist = QHBoxLayout()
+        self.lbl_dist = QLabel()
+        self.lbl_dist.setFixedWidth(220)
+        self.sld_dist = QSlider(Qt.Orientation.Horizontal)
+        self.sld_dist.setRange(MIN_DISTANCE_MM, MAX_DISTANCE_MM)
+        self.sld_dist.setValue(1000)
+        self.sld_dist.valueChanged.connect(self.distance_slider_changed)
+        self.spn_dist = QSpinBox()
+        self.spn_dist.setRange(MIN_DISTANCE_MM, MAX_DISTANCE_MM)
+        self.spn_dist.setValue(1000)
+        self.spn_dist.setSuffix(" mm")
+        self.spn_dist.valueChanged.connect(self.distance_spin_changed)
+        h_dist.addWidget(self.lbl_dist)
+        h_dist.addWidget(self.sld_dist)
+        h_dist.addWidget(self.spn_dist)
+        ctrl_l.addLayout(h_dist)
+
+        self.lbl_limited = QLabel()
+        self.lbl_limited.setStyleSheet("color: #FFC107;")
+        ctrl_l.addWidget(self.lbl_limited)
+
         right_layout.addWidget(grp_ctrl)
 
-        # --- 中间阵列显示区 ---
-        grp_array = QGroupBox("🚀 5x5 物理阵列实时映射图 (硬件视角)")
+        grp_array = QGroupBox("N32 array, E00..E31 maps to transducer_io[0]..[31]")
         array_l = QGridLayout(grp_array)
-        array_l.setSpacing(10)
-        
-        # 创建 5x5 的 Label 阵列 (UI 严格按物理空间排列)
-        for row in range(5):
-            for col in range(5):
-                lbl = QLabel("CH--\nA: 0\nP: 0") # 加入了 CH 标号
-                lbl.setProperty("class", "transducer")
-                lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                lbl.setFixedSize(70, 70)
-                array_l.addWidget(lbl, row, col, alignment=Qt.AlignmentFlag.AlignCenter)
-                self.transducer_labels.append(lbl)
-                
+        array_l.setSpacing(6)
+        positions = self.grid_positions()
+        for ch, (row, col) in enumerate(positions):
+            lbl = QLabel()
+            lbl.setProperty("class", "transducer")
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lbl.setFixedSize(64, 48)
+            array_l.addWidget(lbl, row, col, alignment=Qt.AlignmentFlag.AlignCenter)
+            self.transducer_labels.append(lbl)
         right_layout.addWidget(grp_array, stretch=1)
-        
-        # --- 底部发送按钮 ---
-        self.btn_send = QPushButton("⚡ 下发参数至 FPGA (SYNC)")
+
+        self.btn_send = QPushButton("Sync parameters to FPGA")
         self.btn_send.setObjectName("btn_action")
         self.btn_send.setMinimumHeight(55)
         self.btn_send.setFont(QFont("Microsoft YaHei UI", 14, QFont.Weight.Bold))
@@ -306,122 +306,147 @@ class PhasedArrayWindow(QMainWindow):
         main_layout.addWidget(left_panel)
         main_layout.addWidget(right_panel)
 
+    def make_slider(self, low, high, value):
+        slider = QSlider(Qt.Orientation.Horizontal)
+        slider.setRange(low, high)
+        slider.setValue(value)
+        return slider
+
+    def make_labeled_slider(self, label, slider):
+        layout = QHBoxLayout()
+        label.setFixedWidth(220)
+        layout.addWidget(label)
+        layout.addWidget(slider)
+        return layout
+
+    def grid_positions(self):
+        size = 13
+        max_r = max(max(abs(x), abs(y)) for x, y in self.coords_mm)
+        used = set()
+        positions = []
+        offsets = [(0, 0), (0, 1), (1, 0), (0, -1), (-1, 0), (1, 1), (-1, -1)]
+        for x_mm, y_mm in self.coords_mm:
+            col0 = int(round((x_mm + max_r) / (2.0 * max_r) * (size - 1)))
+            row0 = int(round((max_r - y_mm) / (2.0 * max_r) * (size - 1)))
+            chosen = (row0, col0)
+            for dr, dc in offsets:
+                row = max(0, min(size - 1, row0 + dr))
+                col = max(0, min(size - 1, col0 + dc))
+                if (row, col) not in used:
+                    chosen = (row, col)
+                    break
+            used.add(chosen)
+            positions.append(chosen)
+        return positions
+
     def refresh_ports(self):
         self.cmb_port.clear()
-        for p in serial.tools.list_ports.comports():
-            self.cmb_port.addItem(f"{p.device} ({p.description})")
+        if serial is None:
+            self.cmb_port.addItem("pyserial missing")
+            return
+        for port in serial.tools.list_ports.comports():
+            self.cmb_port.addItem("{} ({})".format(port.device, port.description))
 
     def toggle_serial(self):
-        if self.btn_open.text() == "🔗 连接 FPGA (CONNECT)":
+        if self.btn_open.text() == "Connect FPGA":
             ok, msg = self.logic.open(self.cmb_port.currentText(), self.cmb_baud.currentText())
             if ok:
-                self.btn_open.setText("🚫 断开连接 (DISCONNECT)")
+                self.btn_open.setText("Disconnect FPGA")
                 self.btn_open.setObjectName("btn_danger")
                 self.btn_open.setStyleSheet("background-color: rgba(255, 87, 34, 0.6);")
-                self.log(f"成功连接至 {self.cmb_port.currentText()}", "green")
+                self.log("Connected to {}".format(self.cmb_port.currentText()), "green")
             else:
-                QMessageBox.critical(self, "错误", f"打开串口失败: {msg}")
+                QMessageBox.critical(self, "Serial error", "Open failed: {}".format(msg))
         else:
             self.logic.close()
-            self.btn_open.setText("🔗 连接 FPGA (CONNECT)")
+            self.btn_open.setText("Connect FPGA")
             self.btn_open.setObjectName("btn_action")
             self.btn_open.setStyleSheet("")
-            self.log("连接已断开", "red")
+            self.log("Disconnected", "red")
+
+    def distance_slider_changed(self, value):
+        self.spn_dist.blockSignals(True)
+        self.spn_dist.setValue(value)
+        self.spn_dist.blockSignals(False)
+        self.calculate_array()
+
+    def distance_spin_changed(self, value):
+        self.sld_dist.blockSignals(True)
+        self.sld_dist.setValue(value)
+        self.sld_dist.blockSignals(False)
+        self.calculate_array()
 
     def calculate_array(self):
-        az_deg = self.sld_az.value()
-        el_deg = self.sld_el.value()
-        self.lbl_az.setText(f"水平偏转角 (Azimuth θ): {az_deg}°")
-        self.lbl_el.setText(f"垂直偏转角 (Elevation φ): {el_deg}°")
-        
-        theta = math.radians(az_deg)
-        phi = math.radians(el_deg)
-        
-        win_key = self.cmb_win.currentText()
-        base_amps = self.windows[win_key] # 理论物理网格幅度 (0~24)
-        
-        raw_ticks_grid = []
-        # 物理坐标系：行(y)从上到下，列(x)从左到右 (左上角为 -2, 2)
-        y_coords = [2, 1, 0, -1, -2]
-        x_coords = [-2, -1, 0, 1, 2]
-        
-        # 步骤 1：遍历 5x5 物理空间网格，算出理想的延迟时间
-        for r in range(5):
-            for c in range(5):
-                y_idx = y_coords[r]
-                x_idx = x_coords[c]
-                dt = (x_idx * self.d * math.sin(theta) + y_idx * self.d * math.sin(phi)) / self.c
-                ticks = dt * self.fpga_clk
-                raw_ticks_grid.append(ticks)
-                
-        min_tick = min(raw_ticks_grid)
-        
-        # 步骤 2：通过 S 型映射表，将物理参数填入 FPGA 硬件通道槽位
-        for r in range(5):
-            for c in range(5):
-                grid_idx = r * 5 + c               # UI 和物理网格索引 (0~24)
-                hw_idx = self.grid_to_hw[grid_idx] # FPGA 硬件通道索引 (0~24)
-                
-                # 计算相位并装入正确的硬件发包槽位
-                phase_val = int(round(raw_ticks_grid[grid_idx] - min_tick)) % self.period
-                self.current_phases[hw_idx] = phase_val
-                
-                # 将幅度装入正确的硬件发包槽位
-                amp_val = base_amps[grid_idx]
-                self.current_amps[hw_idx] = amp_val
-                
-                # 更新 UI 阵列气泡
-                lbl = self.transducer_labels[grid_idx]
-                # CH 编号通常从 1 开始，所以显示 hw_idx + 1
-                lbl.setText(f"CH{hw_idx+1}\nA: {amp_val}\nP: {phase_val}")
-                
-                # 高亮最早发波的波阵面前沿 (P=0)
-                if phase_val == 0:
-                    lbl.setStyleSheet("background-color: rgba(255, 87, 34, 0.6); border: 2px solid #FF5722; border-radius: 35px;")
-                else:
-                    lbl.setStyleSheet("background-color: rgba(0, 229, 255, 0.1); border: 1px solid rgba(0, 229, 255, 0.3); border-radius: 35px;")
+        result = calculate_beam_params(
+            distance_mm=self.sld_dist.value(),
+            az_deg=self.sld_az.value(),
+            el_deg=self.sld_el.value(),
+            amp_mode=self.cmb_amp.currentText(),
+            coords_mm=self.coords_mm,
+        )
+        self.current_amps = list(result.amplitudes)
+        self.current_phases = list(result.phases)
+
+        self.lbl_az.setText("Azimuth: {} deg".format(self.sld_az.value()))
+        self.lbl_el.setText("Elevation: {} deg".format(self.sld_el.value()))
+        self.lbl_dist.setText("Focus distance: {:.3f} m".format(result.distance_mm / 1000.0))
+
+        limited = (
+            abs(result.actual_az_deg - self.sld_az.value()) > 0.05
+            or abs(result.actual_el_deg - self.sld_el.value()) > 0.05
+        )
+        if limited:
+            self.lbl_limited.setText(
+                "Vector limit active: az={:.2f} deg, el={:.2f} deg, combined={:.2f} deg".format(
+                    result.actual_az_deg,
+                    result.actual_el_deg,
+                    result.combined_angle_deg,
+                )
+            )
+        else:
+            self.lbl_limited.setText("Combined steering angle: {:.2f} deg".format(result.combined_angle_deg))
+
+        for ch, label in enumerate(self.transducer_labels):
+            amp = self.current_amps[ch]
+            phase = self.current_phases[ch]
+            label.setText("E{:02d}\nA:{:03d}\nP:{:04d}".format(ch, amp, phase))
+            intensity = max(20, min(220, amp))
+            if phase == 0:
+                color = "rgba(255, 87, 34, 0.68)"
+                border = "#FF5722"
+            else:
+                color = "rgba(0, 229, 255, {:.2f})".format(0.10 + 0.45 * intensity / 255.0)
+                border = "rgba(0, 229, 255, 0.45)"
+            label.setStyleSheet(
+                "background-color: {}; border: 1px solid {}; border-radius: 6px; color: #FFFFFF;".format(
+                    color,
+                    border,
+                )
+            )
+
+        if self.chk_auto_send.isChecked():
+            self.auto_timer.start(120)
+
+    def make_packet(self):
+        return build_packet(self.current_amps, self.current_phases)
 
     def send_to_fpga(self):
-        # 组装 79 字节通信协议帧
-        packet = bytearray([0xAA, 0xBB, 0x01]) # 帧头 + 指令码
-        
-        # 25字节 幅度 (uint8)，注意这里发的是映射过后的硬件槽位数组
-        for amp in self.current_amps:
-            packet.append(amp & 0xFF)
-            
-        # 50字节 相位 (uint16 小端)，同理，发硬件槽位数组
-        for ph in self.current_phases:
-            packet.extend(struct.pack('<H', ph))
-            
-        # 校验和 (单字节, 从指令码开始累加)
-        checksum = sum(packet[2:]) % 256
-        packet.append(checksum)
-        
-        # 帧尾: 0x0D 0x0A (\r\n)
-        packet.extend([0x0D, 0x0A])
-        
-        # 硬件发送
+        packet = self.make_packet()
         ok, msg = self.logic.send(packet)
         if ok:
-            # 格式化打印十六进制
-            hex_str = " ".join([f"{b:02X}" for b in packet])
-            self.log(f"成功下发参数 [{len(packet)} Bytes]<br>{hex_str}", "#00E5FF")
+            self.log("Sent N32 params [{} bytes]<br>{}".format(len(packet), format_packet_hex(packet)), "#00E5FF")
         else:
-            self.log(f"发送失败: {msg}", "red")
+            self.log("Send failed: {}".format(msg), "red")
 
-    def log(self, text, color="#FFF"):
-        ts = datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]
-        self.txt_log.append(f"<span style='color:{color};'>[{ts}] {text}</span>")
+    def log(self, text, color="#FFFFFF"):
+        ts = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        self.txt_log.append("<span style='color:{};'>[{}] {}</span>".format(color, ts, text))
 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    
-    # 动态加载样式表中的背景图片
-    bg_path = resource_path("bg.jpg").replace("\\", "/") 
-    new_stylesheet = STYLESHEET.replace("bg.jpg", bg_path)
-    app.setStyleSheet(new_stylesheet)
-    
+    bg_path = resource_path("bg.jpg").replace("\\", "/")
+    app.setStyleSheet(STYLESHEET.replace("bg.jpg", bg_path))
     win = PhasedArrayWindow()
     win.show()
     sys.exit(app.exec())

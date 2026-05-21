@@ -179,8 +179,13 @@ assign config_led = !(i2c_init_done && !i2c_error);
     // 5. 串口协议解析 (幅度与相位控制)
     logic [7:0]  beam_amplitude [0:31];
     logic [11:0] beam_phase     [0:31];
-    logic [7:0]  uart_byte;
-    logic        uart_done;
+    (* mark_debug = "true", keep = "true" *) logic [7:0]  uart_byte;
+    (* mark_debug = "true", keep = "true" *) logic        uart_done;
+    (* mark_debug = "true", keep = "true" *) logic        beam_update_pulse;
+    (* mark_debug = "true", keep = "true" *) logic [15:0] uart_done_stretch_cnt;
+    (* mark_debug = "true", keep = "true" *) logic [15:0] beam_update_stretch_cnt;
+    (* mark_debug = "true", keep = "true" *) logic        uart_done_debug;
+    (* mark_debug = "true", keep = "true" *) logic        beam_update_debug;
     
     uart_rx #(.CLK_FRE(100),
      .BAUD_RATE(115200)) u_uart_rx (
@@ -199,27 +204,30 @@ assign config_led = !(i2c_init_done && !i2c_error);
          .rx_done(uart_done),
         .o_amplitude(beam_amplitude), 
         .o_phase(beam_phase),
-        .o_update_pulse(o_update_pulse)
+        .o_update_pulse(beam_update_pulse)
     );
 
-logic led_s;
-always_ff @( posedge clk_100m or negedge rst_n ) begin
-    if(!rst_n)begin
-        
-        led_s <= 1'b0; 
+    // Stretch single-cycle UART/debug pulses so they are easy to observe in ILA.
+    always_ff @(posedge clk_100m or negedge rst_n) begin
+        if (!rst_n) begin
+            uart_done_stretch_cnt   <= 16'd0;
+            beam_update_stretch_cnt <= 16'd0;
+        end else begin
+            if (uart_done)
+                uart_done_stretch_cnt <= 16'hFFFF;
+            else if (uart_done_stretch_cnt != 16'd0)
+                uart_done_stretch_cnt <= uart_done_stretch_cnt - 1'b1;
+
+            if (beam_update_pulse)
+                beam_update_stretch_cnt <= 16'hFFFF;
+            else if (beam_update_stretch_cnt != 16'd0)
+                beam_update_stretch_cnt <= beam_update_stretch_cnt - 1'b1;
+        end
     end
 
-    else begin
-        if(o_update_pulse)begin
-            led_s <= ~led_s; 
-        end
-         else begin
-            led_s <= led_s;
-         end
-end
-end
+    assign uart_done_debug = (uart_done_stretch_cnt != 16'd0);
+    assign beam_update_debug = (beam_update_stretch_cnt != 16'd0);
 
-assign led = led_s;
     // 6. 核心调制与驱动 (接收 16位音频流)
     pwm32_generator u_pwm32 (
         .clk       (clk_100m),
@@ -229,6 +237,5 @@ assign led = led_s;
         .phase_del (beam_phase),
         .pwm_out   (transducer_io)
     );
-
 
 endmodule
